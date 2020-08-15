@@ -1,11 +1,16 @@
 import functools
 import operator as o
 from os.path import dirname
-from typing import cast, Callable, Dict, Iterable, List, Tuple, TypeVar
+from typing import (TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple,
+                    TypeVar)
 
 import maltypes as t
 from malerrors import MalError
 from printer import pr_str
+from reader import read_str
+
+if TYPE_CHECKING:
+    from malenv import Env  # noqa
 
 
 def malfn(fn: t.MalNativeFunction) -> t.MalFunction:
@@ -78,6 +83,69 @@ def println(*args: t.MalType) -> t.MalType:
     return t.MalNil()
 
 
+@malfn
+def read_string(*args: t.MalType) -> t.MalType:
+    if len(args) != 1 or not isinstance(args[0], t.MalString):
+        raise MalError('Expected read-string arg to be string')
+    return read_str(args[0].value)
+
+
+@malfn
+def slurp(*args: t.MalType) -> t.MalType:
+    if len(args) != 1 or not isinstance(args[0], t.MalString):
+        raise MalError('Expected slurp arg to be string')
+    try:
+        with open(args[0].value, 'r') as f:
+            return t.MalString(f.read())
+    except FileNotFoundError:
+        raise MalError(f'File {args[0].value} does not exist')
+    except OSError:
+        raise MalError(f'Failed to read file {args[0].value}')
+
+
+@malfn
+def atom(*args: t.MalType) -> t.MalType:
+    if len(args) != 1:
+        raise MalError('Expected one argument to atom')
+    return t.MalAtom(args[0])
+
+
+@malfn
+def atom_p(*args: t.MalType) -> t.MalType:
+    if len(args) != 1:
+        raise MalError('Expected one argument to atom?')
+    return t.MalBool(isinstance(args[0], t.MalAtom))
+
+
+@malfn
+def deref(*args: t.MalType) -> t.MalType:
+    if len(args) != 1 or not isinstance(args[0], t.MalAtom):
+        raise MalError('Expected deref argument to be atom')
+    return args[0].inner
+
+
+@malfn
+def reset(*args: t.MalType) -> t.MalType:
+    if len(args) != 2 or not isinstance(args[0], t.MalAtom):
+        raise MalError('Expected atom and value as arguments to reset!')
+    args[0].inner = args[1]
+    return args[1]
+
+
+@malfn
+def swap(*args: t.MalType) -> t.MalType:
+    if (len(args) < 2 or not isinstance(args[0], t.MalAtom)
+            or not isinstance(args[1], t.MalCallable)):
+        raise MalError('Expected atom and function as arguments to swap!')
+    atom, callable_, *rest = args
+    assert isinstance(atom, t.MalAtom) and isinstance(callable_, t.MalCallable)
+    if isinstance(callable_, t.MalTCOFunction):
+        callable_ = callable_.fn
+    assert isinstance(callable_, t.MalFunction), 'Unsupported callable'
+    new_value = atom.inner = callable_.fn(atom.inner, *rest)
+    return new_value
+
+
 pairwise_T = TypeVar('pairwise_T')
 
 
@@ -123,8 +191,25 @@ ns: Dict[str, t.MalFunction] = {
     'pr-str': pr_str_,
     'str': str_,
     'println': println,
+    'read-string': read_string,
+    'slurp': slurp,
+    'atom': atom,
+    'atom?': atom_p,
+    'deref': deref,
+    'reset!': reset,
+    'swap!': swap,
     **cmp_fns,
 }
+
+
+def make_eval(EVAL: Callable[[t.MalType], t.MalType]) -> t.MalFunction:
+    @malfn
+    def evil(*args: t.MalType) -> t.MalType:
+        if len(args) != 1:
+            raise MalError('Expected one argument to eval')
+        return EVAL(args[0])
+
+    return evil
 
 
 def init(rep: Callable[[str], None]):

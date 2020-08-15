@@ -1,9 +1,9 @@
 import enum, re
-from typing import ClassVar, List, Literal, Final, Type, Union
+from typing import List, Literal, Final, Type, Union
 
 from malerrors import MalSyntaxError, MalNoInputError
-from maltypes import (MalType, MalList, MalAtom, MalInt, MalSymbol, MalNil,
-                      MalBool, MalString, MalSequence, MalVector, MalHashMap,
+from maltypes import (MalType, MalList, MalInt, MalSymbol, MalNil, MalBool,
+                      MalString, MalSequence, MalVector, MalHashMap,
                       MalKeyword)
 
 Token = str
@@ -40,7 +40,7 @@ class Reader:
         return self.tokens[self.position]
 
 
-def read_str(in_: str):
+def read_str(in_: str) -> MalType:
     reader = Reader(tokenize(in_))
     return read_form(reader)
 

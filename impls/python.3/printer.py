@@ -26,7 +26,9 @@ def pr_str(form: 't.MalType', print_readably: bool = False) -> str:
     if isinstance(form, t.MalKeyword):
         return f':{form.name}'
     if isinstance(form, t.MalCallable):
-        return f'#<function>'
+        return '#<function>'
+    if isinstance(form, t.MalAtom):
+        return f'(atom {pr_str(form.inner, print_readably)})'
     raise NotImplementedError(type(form))
 
 

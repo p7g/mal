@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import total_ordering
-from itertools import tee
-from typing import TYPE_CHECKING, Callable, Dict, List, Protocol, Tuple
+from typing import TYPE_CHECKING, Dict, List, Protocol
 
 from malerrors import MalSyntaxError
 from printer import pr_str
@@ -60,11 +59,17 @@ class MalHashMap(MalType):
         return hash((type(self).__name__, tuple(self.items)))
 
 
-class MalAtom(MalType, ABC):
-    pass
+class MalAtom(MalType):
+    inner: MalType
+
+    def __init__(self, inner: MalType):
+        self.inner = inner
+
+    def __hash__(self):
+        return hash((type(self).__name__, hash(id(self))))
 
 
-class MalKeyword(MalAtom):
+class MalKeyword(MalType):
     name: str
 
     def __init__(self, name: str):
@@ -75,7 +80,7 @@ class MalKeyword(MalAtom):
 
 
 @total_ordering
-class MalInt(MalAtom):
+class MalInt(MalType):
     value: int
 
     def __init__(self, value: int):
@@ -90,7 +95,7 @@ class MalInt(MalAtom):
         return self.value < other.value
 
 
-class MalSymbol(MalAtom):
+class MalSymbol(MalType):
     name: str
 
     def __init__(self, name: str):
@@ -100,7 +105,7 @@ class MalSymbol(MalAtom):
         return hash((type(self).__name__, self.name))
 
 
-class MalBool(MalAtom):
+class MalBool(MalType):
     value: bool
 
     def __init__(self, value: bool):
@@ -113,7 +118,7 @@ class MalBool(MalAtom):
         return self.value
 
 
-class MalNil(MalAtom):
+class MalNil(MalType):
     def __hash__(self):
         return hash(None)
 
@@ -121,7 +126,7 @@ class MalNil(MalAtom):
         return False
 
 
-class MalString(MalAtom):
+class MalString(MalType):
     value: str
 
     def __init__(self, value: str):
