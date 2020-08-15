@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from functools import total_ordering
-from typing import TYPE_CHECKING, Dict, List, Protocol
+from typing import TYPE_CHECKING, Dict, List
+from typing_compat import Protocol
 
 from malerrors import MalSyntaxError
 from printer import pr_str

@@ -1,5 +1,6 @@
 import enum, re
-from typing import List, Literal, Final, Type, Union
+from typing import List, Type, Union
+from typing_compat import Final, Literal
 
 from malerrors import MalSyntaxError, MalNoInputError
 from maltypes import (MalType, MalList, MalInt, MalSymbol, MalNil, MalBool,
