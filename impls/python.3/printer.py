@@ -25,7 +25,7 @@ def pr_str(form: 't.MalType', print_readably: bool = False) -> str:
         return pr_hashmap(form, print_readably)
     if isinstance(form, t.MalKeyword):
         return f':{form.name}'
-    if isinstance(form, t.MalFunction):
+    if isinstance(form, t.MalCallable):
         return f'#<function>'
     raise NotImplementedError(type(form))
 

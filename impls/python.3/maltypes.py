@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 from functools import total_ordering
 from itertools import tee
-from typing import Callable, Dict, List, Protocol, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Protocol, Tuple
 
 from malerrors import MalSyntaxError
 from printer import pr_str
+
+if TYPE_CHECKING:
+    from malenv import Env
 
 
 class MalType(ABC):
@@ -128,15 +131,36 @@ class MalString(MalAtom):
         return hash(self.value)
 
 
+class MalCallable(MalType, ABC):
+    pass
+
+
 class MalNativeFunction(Protocol):
     def __call__(self, *args: MalType) -> MalType:
         ...
 
 
-class MalFunction(MalType):
+class MalFunction(MalCallable):
     fn: MalNativeFunction
 
     def __init__(self, fn: MalNativeFunction):
+        self.fn = fn
+
+    def __hash__(self):
+        return hash(self.fn)
+
+
+class MalTCOFunction(MalCallable):
+    ast: MalType
+    params: MalType
+    env: 'Env'
+    fn: MalFunction
+
+    def __init__(self, ast: MalType, params: MalType, env: 'Env',
+                 fn: MalFunction):
+        self.ast = ast
+        self.params = params
+        self.env = env
         self.fn = fn
 
     def __hash__(self):
