@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Callable, List, Protocol, Tuple
+from functools import total_ordering
+from itertools import tee
+from typing import Callable, Dict, List, Protocol, Tuple
 
 from malerrors import MalSyntaxError
 from printer import pr_str
@@ -15,6 +17,9 @@ class MalType(ABC):
 
     __str__ = pr_str
 
+    def is_truthy(self) -> bool:
+        return True
+
 
 class MalSequence(MalType, ABC):
     items: List[MalType]
@@ -23,7 +28,10 @@ class MalSequence(MalType, ABC):
         self.items = items
 
     def __hash__(self):
-        return hash((type(self).__hash__, tuple(self.items)))
+        return hash(('MalSequence', tuple(self.items)))
+
+    def __eq__(self, other):
+        return isinstance(other, MalSequence) and hash(self) == hash(other)
 
 
 class MalList(MalSequence):
@@ -34,12 +42,19 @@ class MalVector(MalSequence):
     pass
 
 
-class MalHashMap(MalSequence):
+class MalHashMap(MalType):
+    items: Dict[MalType, MalType]
+
     def __init__(self, items: List[MalType]):
         num_items = len(items)
         if num_items % 2 != 0:
             raise MalSyntaxError('Expected even number of items in hash map')
-        super().__init__(items)
+        self.items = {}
+        for i in range(0, num_items, 2):
+            self.items[items[i]] = items[i + 1]
+
+    def __hash__(self):
+        return hash((type(self).__name__, tuple(self.items)))
 
 
 class MalAtom(MalType, ABC):
@@ -56,6 +71,7 @@ class MalKeyword(MalAtom):
         return hash(self.name)
 
 
+@total_ordering
 class MalInt(MalAtom):
     value: int
 
@@ -64,6 +80,11 @@ class MalInt(MalAtom):
 
     def __hash__(self):
         return hash(self.value)
+
+    def __lt__(self, other):
+        if not isinstance(other, MalInt):
+            return NotImplemented
+        return self.value < other.value
 
 
 class MalSymbol(MalAtom):
@@ -85,10 +106,16 @@ class MalBool(MalAtom):
     def __hash__(self):
         return hash(self.value)
 
+    def is_truthy(self):
+        return self.value
+
 
 class MalNil(MalAtom):
     def __hash__(self):
         return hash(None)
+
+    def is_truthy(self):
+        return False
 
 
 class MalString(MalAtom):
@@ -102,8 +129,6 @@ class MalString(MalAtom):
 
 
 class MalNativeFunction(Protocol):
-    __name__: str
-
     def __call__(self, *args: MalType) -> MalType:
         ...
 

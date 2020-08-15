@@ -61,7 +61,8 @@ def read_form(reader: Reader) -> MalType:
     return read_atom(reader)
 
 
-def read_seq(reader: Reader, delims: str, cls: Type[MalSequence]):
+def read_seq(reader: Reader, delims: str, cls: Union[Type[MalSequence],
+                                                     Type[MalHashMap]]):
     items = []
 
     open_, close = tuple(delims)
@@ -124,7 +125,6 @@ def transform_string(in_: str) -> str:
 
     for c in it:
         if c != '\\':
-            print('appending', c)
             output.append(c)
             continue
         try:

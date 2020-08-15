@@ -3,10 +3,9 @@ try:
 except ImportError:
     pass
 
-import functools
-import operator as o
-from typing import cast, Callable, ChainMap, Dict, List, Tuple
+from typing import cast, ChainMap, List, Sequence
 
+import malcore as core
 import maltypes as t
 from malerrors import MalError, MalNoInputError
 from reader import read_str
@@ -14,27 +13,7 @@ from printer import pr_str
 
 Env = ChainMap[str, t.MalType]
 
-
-def _int_op(op: Callable[[int, int], int]) -> t.MalFunction:
-    @functools.wraps(op)
-    def wrapper(*args: t.MalType) -> t.MalType:
-        if not all(isinstance(i, t.MalInt) for i in args):
-            raise MalError('Only ints are supported as arguments')
-        acc, *rest = map(o.attrgetter('value'),
-                         args)  # type: Tuple[int, List[int]]
-        for i in rest:
-            acc = op(acc, i)
-        return t.MalInt(acc)
-
-    return t.MalFunction(cast(t.MalNativeFunction, wrapper))
-
-
-repl_env: Env = ChainMap({
-    '+': _int_op(o.add),
-    '-': _int_op(o.sub),
-    '*': _int_op(o.mul),
-    '/': _int_op(o.floordiv),
-})
+repl_env: Env = ChainMap(core.ns)
 
 
 def READ(in_: str) -> t.MalType:
@@ -73,7 +52,8 @@ def EVAL(in_: t.MalType, env: Env) -> t.MalType:
                 raise MalError('Expected symbol name to "def!"')
             res = env[dest.name] = EVAL(val, env)
             return res
-        elif f.name == 'let*':
+
+        if f.name == 'let*':
             if len(args) != 2:
                 raise MalError('Expected 2 arguments to "let*"')
             new_env = env.new_child()
@@ -87,10 +67,63 @@ def EVAL(in_: t.MalType, env: Env) -> t.MalType:
                     raise MalError('Expected symbol name in let* binding')
                 new_env[name.name] = EVAL(value, new_env)
             return EVAL(body, new_env)
+
+        if f.name == 'do':
+            if not args:
+                raise MalError('Expected body in do expr')
+            for ast in args:
+                result = EVAL(ast, env)
+            return result
+
+        if f.name == 'if':
+            if len(args) not in (2, 3):
+                raise MalError('Expected 2 or 3 arguments to if')
+            cond, then, *else_ = args
+            if EVAL(cond, env).is_truthy():
+                return EVAL(then, env)
+            elif else_:
+                return EVAL(else_[0], env)
+            return t.MalNil()
+
+        if f.name == 'fn*':
+            if len(args) != 2:
+                raise MalError('Expected 2 arguments to fn*')
+            params, body = args
+            if not isinstance(params, (t.MalList, t.MalVector)):
+                raise MalError('Parameters must be list or vector')
+            if not all(isinstance(p, t.MalSymbol) for p in params.items):
+                raise MalError('Parameters must be symbols')
+            return t.MalFunction(
+                _make_closure(
+                    env, [cast(t.MalSymbol, p).name for p in params.items],
+                    body))
     f, *args = cast(t.MalList, eval_ast(in_, env)).items
     if isinstance(f, t.MalFunction):
         return f.fn(*args)
     raise MalError(f'Value {pr_str(f)} is not callable')
+
+
+def _make_closure(env: Env, binds: List[str],
+                  body: t.MalType) -> t.MalNativeFunction:
+    try:
+        rest_index = binds.index('&')
+    except ValueError:
+        rest_index = -1
+
+    if rest_index != -1:
+        binds.pop(rest_index)
+
+    def closure(*args: t.MalType) -> t.MalType:
+        args2: Sequence[t.MalType]
+        if rest_index != -1:
+            args2 = list(args)
+            args2.insert(rest_index, t.MalList(args2[rest_index:]))
+        else:
+            args2 = args
+        new_env = env.new_child(dict(zip(binds, args2)))
+        return EVAL(body, new_env)
+
+    return closure
 
 
 def PRINT(in_: t.MalType) -> str:
@@ -102,6 +135,8 @@ def rep(in_: str):
 
 
 if __name__ == '__main__':
+    core.init(rep)
+
     while True:
         try:
             print(rep(input('user> ')))

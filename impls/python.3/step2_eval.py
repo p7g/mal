@@ -51,10 +51,11 @@ def eval_ast(ast: t.MalType, env: Env):
     if isinstance(ast, (t.MalList, t.MalVector)):
         return type(ast)([EVAL(i, env) for i in ast.items])
     if isinstance(ast, t.MalHashMap):
-        return t.MalHashMap([
-            EVAL(item, env) if i % 2 == 1 else item
-            for i, item in enumerate(ast.items)
-        ])
+        items = []
+        for k, v in ast.items.items():
+            items.append(k)
+            items.append(EVAL(v, env))
+        return t.MalHashMap(items)
     return ast
 
 
